@@ -111,6 +111,10 @@ func (s *URLTest) All() []string {
 	return s.tags
 }
 
+func (s *URLTest) SelectOutbound(tag string) bool {
+	return s.group.SelectOutbound(tag)
+}
+
 func (s *URLTest) URLTest(ctx context.Context) (map[string]uint16, error) {
 	return s.group.URLTest(ctx)
 }
@@ -334,6 +338,54 @@ func (g *URLTestGroup) Select(network string) (adapter.Outbound, bool) {
 		return nil, false
 	}
 	return minOutbound, true
+}
+
+func (g *URLTestGroup) SelectOutbound(tag string) bool {
+	var selectedOutbound adapter.Outbound
+	for _, ob := range g.outbounds {
+		if ob.Tag() == tag {
+			selectedOutbound = ob
+			break
+		}
+	}
+	if selectedOutbound == nil {
+		return false
+	}
+
+	supportsTCP := common.Contains(selectedOutbound.Network(), N.NetworkTCP)
+	supportsUDP := common.Contains(selectedOutbound.Network(), N.NetworkUDP)
+	if !supportsTCP && !supportsUDP {
+		return false
+	}
+
+	g.updateAccess.Lock()
+	defer g.updateAccess.Unlock()
+	updated := false
+	if supportsTCP {
+		if g.selectedOutboundTCP != selectedOutbound {
+			g.selectedOutboundTCP = selectedOutbound
+			updated = true
+		}
+	} else if g.selectedOutboundTCP != nil {
+		g.selectedOutboundTCP = nil
+		updated = true
+	}
+	if supportsUDP {
+		if g.selectedOutboundUDP != selectedOutbound {
+			g.selectedOutboundUDP = selectedOutbound
+			updated = true
+		}
+	} else if g.selectedOutboundUDP != nil {
+		g.selectedOutboundUDP = nil
+		updated = true
+	}
+	if updated {
+		g.interruptGroup.Interrupt(g.interruptExternalConnections)
+		if g.history != nil {
+			g.history.NotifyUpdated()
+		}
+	}
+	return true
 }
 
 func (g *URLTestGroup) loopCheck(ticker *time.Ticker, closeChan <-chan struct{}) {

@@ -20,6 +20,10 @@ type Outbound interface {
 	N.Dialer
 }
 
+type OutboundSelector interface {
+	SelectOutbound(tag string) bool
+}
+
 type OutboundWithPreferredRoutes interface {
 	Outbound
 	PreferredDomain(metadata *InboundContext, domain string) bool

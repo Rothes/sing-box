@@ -168,16 +168,16 @@ func updateProxy(w http.ResponseWriter, r *http.Request) {
 	}
 
 	proxy := r.Context().Value(CtxKeyProxy).(adapter.Outbound)
-	selector, ok := proxy.(*group.Selector)
+	selector, ok := proxy.(adapter.OutboundSelector)
 	if !ok {
 		render.Status(r, http.StatusBadRequest)
-		render.JSON(w, r, newError("Must be a Selector"))
+		render.JSON(w, r, newError("Must be a Selector or URLTest"))
 		return
 	}
 
 	if !selector.SelectOutbound(req.Name) {
 		render.Status(r, http.StatusBadRequest)
-		render.JSON(w, r, newError("Selector update error: not found"))
+		render.JSON(w, r, newError("Proxy update error"))
 		return
 	}
 
